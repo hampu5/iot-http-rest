@@ -4,7 +4,7 @@ const PORT = 8080
 
 const server = net.createServer(function(connection) {
     console.log('client connected')
-    console.log(connection)
+    // console.log(connection.address())
     
     connection.on('end', function() {
         console.log('client disconnected')
@@ -12,6 +12,7 @@ const server = net.createServer(function(connection) {
 
     connection.on('data', function(data) {
         connection.write(data.toString())
+        // I think it sends response to the 'connection'
         connection.pipe(connection)
     })
     
