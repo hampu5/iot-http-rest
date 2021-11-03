@@ -60,6 +60,13 @@ const server = net.createServer(function(connection) {
                 )
                 connection.end()
                 break
+            case 'PUT':
+                put_data(request_target, body)
+                connection.write(
+                    'HTTP/1.1 200 OK\r\n'
+                )
+                connection.end()
+                break
             case 'DELETE':
                 delete_data(request_target)
                 connection.write(
@@ -77,19 +84,22 @@ const server = net.createServer(function(connection) {
 // Get data from file
 async function get_data(request_target) {
     let content = ''
+    let return_string = `Date: ${new Date().toUTCString()}\r\n`
+
     switch (request_target) {
         case '/website':
             content = await fs.readFile('website.html')
+            return_string += 'Content-Type: text/html\r\n'
             break
         case '/json':
             content = await fs.readFile('data.json')
+            return_string += 'Content-Type: application/json\r\n'
             break
         default:
             break
     }
 
-    let return_string = `Date: ${new Date().toUTCString()}\r\n` +
-        'Content-Type: text/html\r\n' +
+    return_string +=
         '\r\n' +
         content +
         '\r\n'
@@ -99,30 +109,70 @@ async function get_data(request_target) {
 
 // Update file
 async function post_data(request_target, body) {
+    const params = get_url_parameters(body)
+    let path = ''
+
     switch (request_target) {
         case '/website':
-            const path = 'website.html'
-            try {
-                await fs.access(path, fs.F_OK);
-                console.log('can access');
-            } catch {
-                console.error('cannot access');
-            }
+            path = 'website.html'
             let html_body = ''
-            const params = get_url_parameters(body)
             for (const [key, value] of Object.entries(params)) {
                 html_body += `<p>${key}: ${value}</p>\n`
             }
-            fs.appendFile(path, html_body)
+            // Append
+            fs.writeFile(path, html_body,  {'flag':'a'},  function(err) {
+                if (err) {
+                    return console.error(err)
+                }
+            })
             break
         case '/json':
-            fs.open('data.json', )
-            const file = JSON.parse(await fs.open('data.json'))
-            const params2 = get_url_parameters(body)
-            for (const [key, value] of Object.entries(params2)) {
+            path = 'data.json'
+            let file = {}
+            try {
+                // Append to this file
+                file = JSON.parse(await fs.readFile('data.json'))
+            } catch (e) {
+                console.log(e)
+                file = {}
+            }
+            for (const [key, value] of Object.entries(params)) {
                 file[key] = value
             }
-            fs.appendFile('data.json', JSON.stringify(file))
+            fs.writeFile(path, JSON.stringify(file))
+            break
+        default:
+            break
+    }
+}
+
+// Create or replace file
+async function put_data(request_target, body) {
+    const params = get_url_parameters(body)
+    let path = ''
+
+    switch (request_target) {
+        case '/website':
+            path = 'website.html'
+            let html_body = ''
+            for (const [key, value] of Object.entries(params)) {
+                html_body += `<p>${key}: ${value}</p>\n`
+            }
+            // Write this file
+            fs.writeFile(path, html_body, function(err) {
+                if (err) {
+                    return console.error(err)
+                }
+            })
+            break
+        case '/json':
+            path = 'data.json'
+            let file = {}
+            for (const [key, value] of Object.entries(params)) {
+                file[key] = value
+            }
+            // Write this file
+            fs.writeFile(path, JSON.stringify(file))
             break
         default:
             break
