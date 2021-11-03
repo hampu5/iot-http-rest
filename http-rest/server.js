@@ -9,6 +9,27 @@ const options = {
 const request_methods = ['GET', 'POST', 'PUT', 'DELETE']
 const protocol_versions = ['HTTP/1.0', 'HTTP/1.1', 'HTTP/2', 'HTTP/3']
 
+function http_request_lines(data) {
+    const header_and_body = data.toString().split('\r\n\r\n')
+    const header_lines = header_and_body[0].split('\r\n')
+    const request_line = header_lines[0].split(' ')
+
+    const return_obj = {
+        request_line: {
+            request_method: request_line[0],
+            request_target: request_line[1],
+            protocol_version: request_line[2],
+        },
+        body: header_and_body[1]
+    }
+    for (let i = 1; i != header_lines.length; i++) {
+        const header = header_lines[i].split(': ')
+        return_obj[header[0]] = header[1]
+    }
+
+    return return_obj
+}
+
 const server = net.createServer(function(connection) {
     console.log(`client ${connection.remoteAddress}:${connection.remotePort} connected`)
     
@@ -17,25 +38,17 @@ const server = net.createServer(function(connection) {
     })
 
     connection.on('data', function(data) {
-        const header_and_body = data.toString().split('\r\n\r\n')
-        const header_lines = header_and_body[0].split('\r\n')
-        const body = header_and_body[1]
-        const request_line = header_lines[0].split(' ')
+        const http_lines = http_request_lines(data)
 
-        const request_method = request_line[0]
-        const request_target = request_line[1]
-        const protocol_version = request_line[2]
-
-        if (protocol_version !== 'HTTP/1.1') {
+        if (http_lines.request_line.protocol_version !== 'HTTP/1.1') {
             connection.write('HTTP/1.1 505 HTTP Version Not Supported\r\n')
-            
             connection.pipe(connection)
             connection.end()
         }
 
-        switch (request_method) {
+        switch (http_lines.request_line.request_method) {
             case 'GET':
-                get_data(request_target).then((file_data) => {
+                get_data(http_lines.request_line.request_target).then((file_data) => {
                     connection.write(
                         'HTTP/1.1 200 OK\r\n'
                     )
@@ -54,21 +67,21 @@ const server = net.createServer(function(connection) {
                 })
                 break
             case 'POST':
-                post_data(request_target, body)
+                post_data(http_lines.request_line.request_target, http_lines.body)
                 connection.write(
                     'HTTP/1.1 200 OK\r\n'
                 )
                 connection.end()
                 break
             case 'PUT':
-                put_data(request_target, body)
+                put_data(http_lines.request_line.request_target, http_lines.body)
                 connection.write(
                     'HTTP/1.1 200 OK\r\n'
                 )
                 connection.end()
                 break
             case 'DELETE':
-                delete_data(request_target)
+                delete_data(http_lines.request_line.request_target)
                 connection.write(
                     'HTTP/1.1 200 OK\r\n'
                 )
