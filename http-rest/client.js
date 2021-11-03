@@ -23,7 +23,8 @@ const protocol_version = process.argv[4]
 const PORT = 8080
 
 const options = {
-    port: PORT
+    port: PORT,
+    host: 'localhost'
 }
 
 const client = net.connect(options, function() {
@@ -38,5 +39,5 @@ client.on('data', function(data) {
 })
 
 client.on('end', function() { 
-    console.log('disconnected from server')
+    // console.log('disconnected from server')
 })
