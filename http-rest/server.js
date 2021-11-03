@@ -35,20 +35,37 @@ const server = net.createServer(function(connection) {
 
         switch (request_method) {
             case 'GET':
-                fetch_data(request_target).then((file_data) => {
+                get_data(request_target).then((file_data) => {
                     connection.write(
                         'HTTP/1.1 200 OK\r\n'
                     )
                     connection.write(
-                        `Date: ${new Date().toUTCString()}\r\n` +
-                        'Content-Type: text/html\r\n' +
-                        '\r\n'
-                    )
-                    connection.write(
-                        file_data + '\r\n'
+                        file_data
                     )
                     connection.end()
+                }).catch((e) => {
+                    console.error(e)
+                    if (e.errno === -2) {
+                        connection.write(
+                            'HTTP/1.1 404 Not Found\r\n\r\n'
+                        )
+                    }
+                    connection.end()
                 })
+                break
+            case 'POST':
+                post_data(request_target, body)
+                connection.write(
+                    'HTTP/1.1 200 OK\r\n'
+                )
+                connection.end()
+                break
+            case 'DELETE':
+                delete_data(request_target)
+                connection.write(
+                    'HTTP/1.1 200 OK\r\n'
+                )
+                connection.end()
                 break
             default:
                 break
@@ -57,13 +74,90 @@ const server = net.createServer(function(connection) {
     })
 })
 
-async function fetch_data(request_target) {
+// Get data from file
+async function get_data(request_target) {
+    let content = ''
     switch (request_target) {
         case '/website':
-            return await fs.readFile('website.html', 'utf8')
+            content = await fs.readFile('website.html')
+            break
+        case '/json':
+            content = await fs.readFile('data.json')
+            break
         default:
             break
     }
+
+    let return_string = `Date: ${new Date().toUTCString()}\r\n` +
+        'Content-Type: text/html\r\n' +
+        '\r\n' +
+        content +
+        '\r\n'
+
+    return return_string
+}
+
+// Update file
+async function post_data(request_target, body) {
+    switch (request_target) {
+        case '/website':
+            const path = 'website.html'
+            try {
+                await fs.access(path, fs.F_OK);
+                console.log('can access');
+            } catch {
+                console.error('cannot access');
+            }
+            let html_body = ''
+            const params = get_url_parameters(body)
+            for (const [key, value] of Object.entries(params)) {
+                html_body += `<p>${key}: ${value}</p>\n`
+            }
+            fs.appendFile(path, html_body)
+            break
+        case '/json':
+            fs.open('data.json', )
+            const file = JSON.parse(await fs.open('data.json'))
+            const params2 = get_url_parameters(body)
+            for (const [key, value] of Object.entries(params2)) {
+                file[key] = value
+            }
+            fs.appendFile('data.json', JSON.stringify(file))
+            break
+        default:
+            break
+    }
+}
+
+// Delete a file
+function delete_data(request_target) {
+    switch (request_target) {
+        case '/website':
+            fs.unlink('website.html', (err) => {
+                if (err) throw err
+                console.log('website.html was deleted')
+              })
+            break
+        case '/json':
+            fs.unlink('data.json', (err) => {
+                if (err) throw err
+                console.log('data.json was deleted')
+              })
+            break
+        default:
+            break
+    }
+}
+
+function get_url_parameters(body) {
+    const result = {}
+    if (!body) return result
+    const url_pairs = body.split('&')
+    url_pairs.forEach((pair) => {
+        const kv_pair = pair.split('=')
+        result[kv_pair[0]] = kv_pair[1]
+    })
+    return result
 }
 
  server.listen(options, function() {
