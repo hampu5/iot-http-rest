@@ -12,29 +12,34 @@ const options = {
 const server = new httpServer()
 
 server.get('/website', async (request, response) => {
-    const content = await fs.readFile('website.html')
-    //console.log("WOrks!")
-    response.send(content.toString())
+    try{
+        const content = await fs.readFile('website.html')
+        response.send(content.toString())
+    } catch (err) {
+        if (err.code == 'ENOENT') {
+            response.send('', '404')
+        }
+    }
 })
 
 server.post('/website', async (request, response) => {
     try {
-        fs.stat('website.html')
+        await fs.stat('website.html')
         console.log('file or directory already exists')
+        response.send('', '409')
     }
     catch (err) {
         if (err.code === 'ENOENT') {
             console.log('file or directory does not exist')
             let html_body = ''
-            for (const [key, value] of Object.entries(params)) {
+            for (const [key, value] of Object.entries(request.urlParameters)) {
                 html_body += `<p>${key}: ${value}</p>\n`
             }
             // Append
-            fs.writeFile('website.html', html_body,  {'flag':'a'})
+            await fs.writeFile('website.html', html_body,  {'flag':'a'})
+            response.send('', '201')
         }
     }
-
-    // response.send(content.toString())
 })
 
 server.listen(options, () => {
