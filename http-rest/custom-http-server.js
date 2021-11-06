@@ -1,18 +1,21 @@
-// const net = require('net')
 import net from 'net'
-// const fs = require('fs').promises
-import fs from 'fs/promises'
 
 const options = {
     port: 8080,
     host: 'localhost'
 }
 
-const request_methods = ['GET', 'POST', 'PUT', 'DELETE']
-const protocol_versions = ['HTTP/1.0', 'HTTP/1.1', 'HTTP/2', 'HTTP/3']
+// const request_methods = ['GET', 'POST', 'PUT', 'DELETE']
+// const protocol_versions = ['HTTP/1.0', 'HTTP/1.1', 'HTTP/2', 'HTTP/3']
 
 export default function httpServer() {
     const paths = {}
+    const codePhrases = {
+        '200': 'OK',
+        '201': 'Created',
+        '404': 'Not Found',
+        '409': 'Conflict'
+    }
 
     const tcpServer = net.createServer(function(connection) {
         console.log(`client ${connection.remoteAddress}:${connection.remotePort} connected`)
@@ -24,7 +27,7 @@ export default function httpServer() {
         connection.on('data', function(data) {
             const httpLines = http_request_lines(data)
             const path = httpLines.request_line.request_target
-            const method = httpLines.request_line.request_method
+            const method = httpLines.request_line.request_method.toLowerCase()
             const version = httpLines.request_line.protocol_version
     
             if (version !== 'HTTP/1.1') {
@@ -33,82 +36,10 @@ export default function httpServer() {
                 connection.end()
             }
 
-            
-
-
+            // Calls the http-method-callback for the requested path
             paths[path][method](connection, httpLines.body)
-    
-            // switch (httpLines.request_line.request_method) {
-            //     case 'GET':
-            //         get_data(httpLines.request_line.request_target).then((file_data) => {
-            //             connection.write(
-            //                 'HTTP/1.1 200 OK\r\n'
-            //             )
-            //             connection.write(
-            //                 file_data
-            //             )
-            //             connection.end()
-            //         }).catch((e) => {
-            //             console.error(e)
-            //             if (e.errno === -2) {
-            //                 connection.write(
-            //                     'HTTP/1.1 404 Not Found\r\n\r\n'
-            //                 )
-            //             }
-            //             connection.end()
-            //         })
-            //         break
-            //     case 'POST':
-            //         post_data(httpLines.request_line.request_target, httpLines.body)
-            //         connection.write(
-            //             'HTTP/1.1 200 OK\r\n'
-            //         )
-            //         connection.end()
-            //         break
-            //     case 'PUT':
-            //         put_data(httpLines.request_line.request_target, httpLines.body)
-            //         connection.write(
-            //             'HTTP/1.1 200 OK\r\n'
-            //         )
-            //         connection.end()
-            //         break
-            //     case 'DELETE':
-            //         delete_data(httpLines.request_line.request_target)
-            //         connection.write(
-            //             'HTTP/1.1 200 OK\r\n'
-            //         )
-            //         connection.end()
-            //         break
-            //     default:
-            //         break
-            // }
-            
         })
     })
-
-    // const response = {
-    //     send: function(data) {
-    //         connection.write(
-    //             'HTTP/1.1 200 OK\r\n' +
-    //             `Date: ${new Date().toUTCString()}\r\n`
-    //         )
-    //         // connection.write(
-    //         //     'Content-Type: text/html\r\n' // save this earlier in the get() function
-    //         // )
-    //         connection.write(
-    //             '\r\n' +
-    //             data +
-    //             '\r\n'
-    //             )
-    //     }
-    // }
-
-    const codePhrases = {
-        '200': 'OK',
-        '201': 'Created',
-        '404': 'Not Found',
-        '409': 'Conflict'
-    }
 
     function createRequest(requestBody) {
         const params = getUrlParameters(requestBody)
@@ -117,7 +48,7 @@ export default function httpServer() {
         }
     }
 
-    function createResponse(connection, statusLine) {
+    function createResponse(connection) {
         return {
             send: function(data = '', code = '200') {
                 // Status line
@@ -133,181 +64,37 @@ export default function httpServer() {
                 // Body
                 if (data !== '') {
                     connection.write(
-                        data +
-                        '\r\n'
+                        data
                     )
                 }
+                // await new Promise(resolve => setTimeout(resolve, 5000));
                 connection.end()
             }
         }
     }
 
-    this.get = function(path, callback) {
-        const newCallback = function(connection, requestBody) {
-            const response = createResponse(connection)
-            callback({}, response) // add request object as well
-        }
-        paths[path] = {
-            ...paths[path],
-            GET: newCallback
-        }
-    }
-
-    this.post = function(path, callback) {
+    function method(path, callback, verb) {
         const newCallback = function(connection, requestBody) {
             const request = createRequest(requestBody)
             const response = createResponse(connection)
             callback(request, response) // add request object as well
         }
+        
         paths[path] = {
             ...paths[path],
-            POST: newCallback
+            [verb]: newCallback
         }
     }
 
-    this.put = function(path, callback) {
-        const newCallback = function(connection) {
-            const statusLine = 'HTTP/1.1 201 Created\r\n'
-            const response = createResponse(connection, statusLine)
-            try {
-                callback({}, response) // add request object as well
-            } catch (error) {
-                console.error(error)
-                if (e.errno === -2) {
-                    connection.write(
-                        'HTTP/1.1 404 Not Found\r\n\r\n'
-                    )
-                }
-                connection.end()
-            }
-            
+    const verb = ['get', 'post', 'put', 'delete']
+    verb.forEach((verb) => {
+        this[verb] = function(path, callback) {
+            method(path, callback, verb)
         }
-        paths[path] = {
-            ...paths[path],
-            PUT: newCallback
-        }
-    }
+    })
 
     this.listen = function(options, callback) {
         tcpServer.listen(options, callback())
-    }
-}
-
-// Get data from file
-async function get_data(request_target) {
-    let content = ''
-    let return_string = `Date: ${new Date().toUTCString()}\r\n`
-
-    switch (request_target) {
-        case '/website':
-            content = await fs.readFile('website.html')
-            return_string += 'Content-Type: text/html\r\n'
-            break
-        case '/json':
-            content = await fs.readFile('data.json')
-            return_string += 'Content-Type: application/json\r\n'
-            break
-        default:
-            break
-    }
-
-    return_string +=
-        '\r\n' +
-        content +
-        '\r\n'
-
-    return return_string
-}
-
-// Update file
-async function post_data(request_target, body) {
-    const params = getUrlParameters(body)
-    let path = ''
-
-    switch (request_target) {
-        case '/website':
-            path = 'website.html'
-            let html_body = ''
-            for (const [key, value] of Object.entries(params)) {
-                html_body += `<p>${key}: ${value}</p>\n`
-            }
-            // Append
-            fs.writeFile(path, html_body,  {'flag':'a'},  function(err) {
-                if (err) {
-                    return console.error(err)
-                }
-            })
-            break
-        case '/json':
-            path = 'data.json'
-            let file = {}
-            try {
-                // Append to this file
-                file = JSON.parse(await fs.readFile('data.json'))
-            } catch (e) {
-                console.log(e)
-                file = {}
-            }
-            for (const [key, value] of Object.entries(params)) {
-                file[key] = value
-            }
-            fs.writeFile(path, JSON.stringify(file))
-            break
-        default:
-            break
-    }
-}
-
-// Create or replace file
-async function put_data(request_target, body) {
-    const params = getUrlParameters(body)
-    let path = ''
-
-    switch (request_target) {
-        case '/website':
-            path = 'website.html'
-            let html_body = ''
-            for (const [key, value] of Object.entries(params)) {
-                html_body += `<p>${key}: ${value}</p>\n`
-            }
-            // Write this file
-            fs.writeFile(path, html_body, function(err) {
-                if (err) {
-                    return console.error(err)
-                }
-            })
-            break
-        case '/json':
-            path = 'data.json'
-            let file = {}
-            for (const [key, value] of Object.entries(params)) {
-                file[key] = value
-            }
-            // Write this file
-            fs.writeFile(path, JSON.stringify(file))
-            break
-        default:
-            break
-    }
-}
-
-// Delete a file
-function delete_data(request_target) {
-    switch (request_target) {
-        case '/website':
-            fs.unlink('website.html', (err) => {
-                if (err) throw err
-                console.log('website.html was deleted')
-              })
-            break
-        case '/json':
-            fs.unlink('data.json', (err) => {
-                if (err) throw err
-                console.log('data.json was deleted')
-              })
-            break
-        default:
-            break
     }
 }
 
