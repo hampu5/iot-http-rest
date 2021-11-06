@@ -18,13 +18,22 @@ server.get('/website', async (request, response) => {
 })
 
 server.post('/website', async (request, response) => {
-    let html_body = ''
-    for (const [key, value] of Object.entries(params)) {
-        html_body += `<p>${key}: ${value}</p>\n`
+    try {
+        fs.stat('website.html')
+        console.log('file or directory already exists')
     }
-    // Append
-    fs.writeFile('website.html', html_body,  {'flag':'a'})
-    
+    catch (err) {
+        if (err.code === 'ENOENT') {
+            console.log('file or directory does not exist')
+            let html_body = ''
+            for (const [key, value] of Object.entries(params)) {
+                html_body += `<p>${key}: ${value}</p>\n`
+            }
+            // Append
+            fs.writeFile('website.html', html_body,  {'flag':'a'})
+        }
+    }
+
     // response.send(content.toString())
 })
 
