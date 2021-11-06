@@ -106,7 +106,7 @@ export default function httpServer() {
     this.get = function(path, callback) {
         const get_callback = function(connection) {
             const response = {
-                send: function(data) {
+                send: function(data = '') {
                     connection.write(
                         'HTTP/1.1 200 OK\r\n' +
                         `Date: ${new Date().toUTCString()}\r\n`
@@ -138,6 +138,44 @@ export default function httpServer() {
         paths[path] = {
             ...paths[path],
             GET: get_callback
+        }
+    }
+
+    this.post = function(path, callback) {
+        const new_callback = function(connection) {
+            const response = {
+                send: function(data = '') {
+                    connection.write(
+                        'HTTP/1.1 200 OK\r\n' +
+                        `Date: ${new Date().toUTCString()}\r\n`
+                    )
+                    // connection.write(
+                    //     'Content-Type: text/html\r\n' // save this earlier in the get() function
+                    // )
+                    connection.write(
+                        '\r\n' +
+                        data +
+                        '\r\n'
+                    )
+                    connection.end()
+                }
+            }
+            try {
+                callback({}, response) // add request object as well
+            } catch (error) {
+                console.error(error)
+                if (e.errno === -2) {
+                    connection.write(
+                        'HTTP/1.1 404 Not Found\r\n\r\n'
+                    )
+                }
+                connection.end()
+            }
+            
+        }
+        paths[path] = {
+            ...paths[path],
+            POST: new_callback
         }
     }
 
