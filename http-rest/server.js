@@ -11,10 +11,10 @@ const options = {
 
 const server = new httpServer()
 
-server.get('/website', async (request, response) => {
-    try{
-        const content = await fs.readFile('website.html')
-        response.send(content.toString())
+server.get('/json', async (request, response) => {
+    try {
+        const dataObject = await fs.readFile('data.json')
+        response.send(dataObject.toString())
     } catch (err) {
         if (err.code == 'ENOENT') {
             response.send('', '404')
@@ -22,22 +22,42 @@ server.get('/website', async (request, response) => {
     }
 })
 
-server.post('/website', async (request, response) => {
+server.post('/json', async (request, response) => {
     try {
-        await fs.stat('website.html')
-        console.log('file or directory already exists')
+        await fs.stat('data.json')
         response.send('', '409')
     }
     catch (err) {
         if (err.code === 'ENOENT') {
-            console.log('file or directory does not exist')
-            let html_body = ''
-            for (const [key, value] of Object.entries(request.urlParameters)) {
-                html_body += `<p>${key}: ${value}</p>\n`
-            }
-            // Append
-            await fs.writeFile('website.html', html_body,  {'flag':'a'})
+            await fs.writeFile('data.json', JSON.stringify({}))
             response.send('', '201')
+        }
+    }
+})
+
+server.put('/json', async (request, response) => {
+    try {
+        await fs.stat('data.json')
+        const dataObject = {}
+        for (const [key, value] of Object.entries(request.urlParameters)) {
+            dataObject[key] = value
+        }
+        await fs.writeFile('data.json', JSON.stringify(dataObject))
+        response.send()
+    } catch (err) {
+        if (err.code == 'ENOENT') {
+            response.send('', '404')
+        }
+    }
+})
+
+server.delete('/json', async (request, response) => {
+    try {
+        await fs.unlink('data.json')
+        response.send()
+    } catch (err) {
+        if (err.code == 'ENOENT') {
+            response.send('', '404')
         }
     }
 })
