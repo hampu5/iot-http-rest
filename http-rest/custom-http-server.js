@@ -22,10 +22,10 @@ export default function httpServer() {
         })
     
         connection.on('data', function(data) {
-            const http_lines = http_request_lines(data)
-            const path = http_lines.request_line.request_target
-            const method = http_lines.request_line.request_method
-            const version = http_lines.request_line.protocol_version
+            const httpLines = http_request_lines(data)
+            const path = httpLines.request_line.request_target
+            const method = httpLines.request_line.request_method
+            const version = httpLines.request_line.protocol_version
     
             if (version !== 'HTTP/1.1') {
                 connection.write('HTTP/1.1 505 HTTP Version Not Supported\r\n')
@@ -36,11 +36,11 @@ export default function httpServer() {
             
 
 
-            paths[path][method](connection)
+            paths[path][method](connection, httpLines.body)
     
-            // switch (http_lines.request_line.request_method) {
+            // switch (httpLines.request_line.request_method) {
             //     case 'GET':
-            //         get_data(http_lines.request_line.request_target).then((file_data) => {
+            //         get_data(httpLines.request_line.request_target).then((file_data) => {
             //             connection.write(
             //                 'HTTP/1.1 200 OK\r\n'
             //             )
@@ -59,21 +59,21 @@ export default function httpServer() {
             //         })
             //         break
             //     case 'POST':
-            //         post_data(http_lines.request_line.request_target, http_lines.body)
+            //         post_data(httpLines.request_line.request_target, httpLines.body)
             //         connection.write(
             //             'HTTP/1.1 200 OK\r\n'
             //         )
             //         connection.end()
             //         break
             //     case 'PUT':
-            //         put_data(http_lines.request_line.request_target, http_lines.body)
+            //         put_data(httpLines.request_line.request_target, httpLines.body)
             //         connection.write(
             //             'HTTP/1.1 200 OK\r\n'
             //         )
             //         connection.end()
             //         break
             //     case 'DELETE':
-            //         delete_data(http_lines.request_line.request_target)
+            //         delete_data(httpLines.request_line.request_target)
             //         connection.write(
             //             'HTTP/1.1 200 OK\r\n'
             //         )
@@ -103,74 +103,70 @@ export default function httpServer() {
     //     }
     // }
 
+    const codePhrases = {
+        '200': 'OK',
+        '201': 'Created',
+        '404': 'Not Found',
+        '409': 'Conflict'
+    }
+
+    function createRequest(requestBody) {
+        const params = getUrlParameters(requestBody)
+        return {
+            urlParameters: params
+        }
+    }
+
     function createResponse(connection, statusLine) {
         return {
-            send: function(data = '') {
+            send: function(data = '', code = '200') {
+                // Status line
                 connection.write(
-                    statusLine
+                    `HTTP/1.1 ${code} ${codePhrases[code]}\r\n`
                 )
+                // Header fields
                 connection.write(
                     `Date: ${new Date().toUTCString()}\r\n`
                     // 'Content-Type: text/html\r\n' // save this earlier in the get() function
                 )
-                connection.write(
-                    '\r\n' +
-                    data +
-                    '\r\n'
-                )
+                connection.write('\r\n')
+                // Body
+                if (data !== '') {
+                    connection.write(
+                        data +
+                        '\r\n'
+                    )
+                }
                 connection.end()
             }
         }
     }
 
     this.get = function(path, callback) {
-        const get_callback = function(connection) {
-            const statusLine = 'HTTP/1.1 200 OK\r\n'
-            const response = createResponse(connection, statusLine)
-            try {
-                callback({}, response) // add request object as well
-            } catch (error) {
-                console.error(error)
-                if (e.errno === -2) {
-                    connection.write(
-                        'HTTP/1.1 404 Not Found\r\n\r\n'
-                    )
-                }
-                connection.end()
-            }
-            
+        const newCallback = function(connection, requestBody) {
+            const response = createResponse(connection)
+            callback({}, response) // add request object as well
         }
         paths[path] = {
             ...paths[path],
-            GET: get_callback
+            GET: newCallback
         }
     }
 
     this.post = function(path, callback) {
-        const new_callback = function(connection) {
-            const statusLine = 'HTTP/1.1 201 Created\r\n'
-            const response = createResponse(connection, statusLine)
-            try {
-                callback({}, response) // add request object as well
-            } catch (error) {
-                console.error(error)
-                if (e.errno === -2) {
-                    connection.write(
-                        'HTTP/1.1 404 Not Found\r\n\r\n'
-                    )
-                }
-                connection.end()
-            }
-            
+        const newCallback = function(connection, requestBody) {
+            const request = createRequest(requestBody)
+            const response = createResponse(connection)
+            callback(request, response) // add request object as well
         }
         paths[path] = {
             ...paths[path],
-            POST: new_callback
+            POST: newCallback
         }
     }
 
     this.put = function(path, callback) {
-        const new_callback = function(connection) {
+        const newCallback = function(connection) {
             const statusLine = 'HTTP/1.1 201 Created\r\n'
             const response = createResponse(connection, statusLine)
             try {
@@ -188,7 +184,7 @@ export default function httpServer() {
         }
         paths[path] = {
             ...paths[path],
-            PUT: new_callback
+            PUT: newCallback
         }
     }
 
@@ -225,7 +221,7 @@ async function get_data(request_target) {
 
 // Update file
 async function post_data(request_target, body) {
-    const params = get_url_parameters(body)
+    const params = getUrlParameters(body)
     let path = ''
 
     switch (request_target) {
@@ -264,7 +260,7 @@ async function post_data(request_target, body) {
 
 // Create or replace file
 async function put_data(request_target, body) {
-    const params = get_url_parameters(body)
+    const params = getUrlParameters(body)
     let path = ''
 
     switch (request_target) {
@@ -340,7 +336,7 @@ function http_request_lines(data) {
     return return_obj
 }
 
-function get_url_parameters(body) {
+function getUrlParameters(body) {
     const result = {}
     if (!body) return result
     const url_pairs = body.split('&')
