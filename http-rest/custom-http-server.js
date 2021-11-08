@@ -51,13 +51,15 @@ export default function httpServer() {
     function createResponse(connection) {
         return {
             send: function(data = '', code = '200') {
+                const bodyLength = Buffer.byteLength(data, 'utf8')
                 // Status line
                 connection.write(
                     `HTTP/1.1 ${code} ${codePhrases[code]}\r\n`
                 )
                 // Header fields
                 connection.write(
-                    `Date: ${new Date().toUTCString()}\r\n`
+                    `Date: ${new Date().toUTCString()}\r\n` +
+                    `Content-Length: ${bodyLength}\r\n`
                     // 'Content-Type: text/html\r\n' // save this earlier in the get() function
                 )
                 connection.write('\r\n')
