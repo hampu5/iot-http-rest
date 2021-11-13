@@ -31,7 +31,6 @@ const reqCode = (() => {
     }
 })()
 
-
 const requestTarget = process.argv[3]
 const payload = process.argv[4] || ''
 
@@ -70,60 +69,57 @@ function getMessage() {
     byteArray.push(0xFF & (mid >>> 8))
     byteArray.push(0xFF & mid)
 
+    const options = [
+        {num: 3, length: remoteAddress.length, val: remoteAddress},
+        {num: 7, length: 2, val: remotePort}, // this is a numerical (int) value
+        {num: 11, length: requestTarget.length, val: requestTarget}
+    ]
+
     // Options
     let previousOptionNumber = 0
-    for (let i = 0; i < 12; i++) {
-        let optionDelta = i - previousOptionNumber
-        switch (i) {
-            // case 3:
-            //     byteArray.push(0xFF &  ((3 << 4) | remoteAddress.length))
-            //     for (let char of remoteAddress) {
-            //         byteArray.push(0xFF & char.charCodeAt(0))
-            //     }
-            //     previousOptionNumber = i
-            //     break
-            // case 7:
-            //     byteArray.push(0xFF & ((4 << 4) | remotePort.length))
-            //     for (let char of remotePort) {
-            //         byteArray.push(char.charCodeAt(0))
-            //         console.log(char.charCodeAt(0))
-            //     }
-            //     console.log(byteArray)
-            //     previousOptionNumber = i
-            //     break
-            case 11:
-                byteArray.push(0xFF & ((optionDelta << 4) | requestTarget.length))
-                for (let char of requestTarget) {
-                    byteArray.push(char.charCodeAt(0))
-                }
-                previousOptionNumber = i
-                break
-            default:
-                break
+    for (let option of options) {
+        let optionDelta = option.num - previousOptionNumber
+        byteArray.push(0xFF &  ((optionDelta << 4) | option.length))
+        if (option.num === 7) { // Numerical (integer) values, e.g., uri-port
+            const tempArr = intToBytes(option.val)
+            for (let byte of tempArr)
+                byteArray.push(byte)
+        } else { // String values
+            for (let char of option.val)
+                byteArray.push(0xFF & char.charCodeAt(0))
         }
+        previousOptionNumber = option.num
     }
     
     // If no payload
-    if (payload === '') {
-		// To string
-        let packet = new Buffer.from(byteArray)
-        return packet
+    if (payload !== '') {
+        // Options Delimiter
+        byteArray.push(0xFF);
     }
+   
+    // Header to Buffer
+    let bufHeader = new Buffer.from(byteArray)
+    
+    // Payload to Buffer
+    let bufPayload = new Buffer.from(payload)
 
-    // Delimiter
-    byteArray.push(0xFF);
-
-    // To string
-    let packet = (new Buffer.from(byteArray)).toString()
-	
-    // Payload
-    packet += (new Buffer.from(payload)).toString()
-
-    // finished
+    const packet = new Buffer.concat([bufHeader, bufPayload])
+    console.log(packet)
+    
+    // Return CoAP packet
     return packet;
 }
 
 
+
+function intToBytes(i) {
+	var b = new Array(0)
+	while (i > 0) {
+		b.unshift(0xFF & i)
+		i >>>= 8
+	}
+	return b
+}
 
 // function coapHeaderOptions(data) {
 //     return data[4]<<
