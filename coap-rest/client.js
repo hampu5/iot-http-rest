@@ -31,11 +31,14 @@ const reqCode = (() => {
     }
 })()
 
-const requestTarget = process.argv[3]
+// domain name and path, split
+const uri = process.argv[3].split('/')
+
+const requestPath = uri[1]
 const payload = process.argv[4] || ''
 
 const remotePort = '5683'
-const remoteAddress = 'coap.me'
+const remoteAddress = uri[0]
 
 const udpsocket = dgram.createSocket('udp4')
 udpsocket.connect(remotePort, remoteAddress)
@@ -45,8 +48,42 @@ udpsocket.on('connect', () => {
     udpsocket.send(message)
 })
 
+// With Proxy a getter can be added that returns a default value for
+// keys that don't have values.
+const objSuccessCode = new Proxy({
+    1: 'Success 2.1 Created',
+    2: 'Success 2.2 Deleted',
+    3: 'Success 2.3 Valid',
+    4: 'Success 2.4 Changed',
+    5: 'Success 2.5 Content'
+}, {get: defaultKey('2.ERR')})
+
+// Two below not implemented
+const objClientErrorCode = new Proxy({}, {get: defaultKey('Client Error 4')})
+const objServerErrorCode = new Proxy({}, {get: defaultKey('Server Error 4')})
+
+const objClassCode = new Proxy({
+    2: objSuccessCode,
+    4: objClientErrorCode,
+    5: objServerErrorCode
+}, {get: defaultKey(objClientErrorCode)}) // Just Client error if no Class
+
+function defaultKey(defaultText) {
+    return function(object, property) {
+        return object.hasOwnProperty(property) ? object[property] : defaultText
+    }
+}
+
 udpsocket.on('message', (data) => {
-    console.log(`Got something: ${data}`)
+    const hClass = COAP_HEADER_CLASS(data)
+    const hCode = COAP_HEADER_CODE(data)
+    const hMID = COAP_HEADER_MID(data)
+    const payload = data.slice(data.indexOf(0xFF) + 1) // Slice on header and payload
+
+    // Use objects to get the status message
+    const statusMessage = objClassCode[hClass][hCode]
+    
+    console.log(statusMessage + `: ${payload}`)
     udpsocket.close()
 })
 
@@ -72,7 +109,7 @@ function getMessage() {
     const options = [
         {num: 3, length: remoteAddress.length, val: remoteAddress},
         {num: 7, length: 2, val: remotePort}, // this is a numerical (int) value
-        {num: 11, length: requestTarget.length, val: requestTarget}
+        {num: 11, length: requestPath.length, val: requestPath}
     ]
 
     // Options
@@ -104,14 +141,13 @@ function getMessage() {
     let bufPayload = new Buffer.from(payload)
 
     const packet = new Buffer.concat([bufHeader, bufPayload])
-    console.log(packet)
     
     // Return CoAP packet
     return packet;
 }
 
 
-
+// Takes a number (int), makes into byte array
 function intToBytes(i) {
 	var b = new Array(0)
 	while (i > 0) {
