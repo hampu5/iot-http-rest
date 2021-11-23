@@ -1,1 +1,1 @@
-{"type":"module"}
+{"type":"module","dependencies":{"mqtt":"^4.2.8"}}
