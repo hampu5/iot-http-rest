@@ -3,13 +3,16 @@ import mqtt from 'mqtt'
 const client  = mqtt.connect({port: 1883, host: 'localhost', keepalive: 5})
 
 client.on('connect', function (connack) {
+
     // console.log(`Connected, CONNACK: ${connack}`)
     // console.log(connack)
-    // client.subscribe('presence', function (err) {
-    //     if (!err) {
-    //         client.publish('presence', 'Hello mqtt')
-    //     }
-    // })
+    client.subscribe('sensor', function (err) {
+        if (!err) {
+            // client.publish('presence', 'Hello mqtt')
+        } else {
+            console.log('THERE WAS ERROR')
+        }
+    })
 })
 
 client.on('message', function (topic, message) {
