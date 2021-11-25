@@ -18,7 +18,7 @@ class MQTTClientConnection
     def initialize(client)
         @client = client
         @client_id = ''
-        @topics = {'sensor' => 5}
+        @topics = {}
     end
 
     def receive(connected_clients)
@@ -37,6 +37,8 @@ class MQTTClientConnection
             case packet_type
             when TYPE::CONNECT
                 response = handle_connect(data, data_string, connected_clients, counter)
+            when TYPE::PUBLISH
+                response = handle_publish(data, data_string, connected_clients, counter)
             when TYPE::SUBSCRIBE
                 response = handle_subscribe(data, data_string, connected_clients, counter)
             when TYPE::PINGREQ
@@ -103,6 +105,47 @@ class MQTTClientConnection
 
         # Response
         return [0x20, 0x02, 0x00, 0x00].pack('C*')
+    end
+
+    def handle_publish(data, data_string, connected_clients, counter)
+        # First Byte (second 4 bits)
+        dup_flag = (0x0F & data[counter]) >> 3
+        qos_level = (0b00000111 & data[counter]) >> 1 # Should be 1
+        retain = (0b00000001)
+        counter += 1
+
+        # Second Byte
+        remaining_length = data[counter]
+        counter += 1
+        
+        # Third and Fourth Bytes (length in connect/publish)
+        topic_length_msb = data[counter]
+        counter += 1
+        topic_length_lsb = data[counter]
+        topic_length = (topic_length_msb << 8) | topic_length_lsb
+        counter += 1
+
+        # Topic characters
+        topic = ''
+        for i in 0..topic_length-1 do
+            topic += data_string[counter]
+            counter += 1
+        end
+
+        # Payload (Value that is published)
+        payload = ''
+        start_of_payload_byte = counter
+        puts remaining_length
+        puts start_of_payload_byte
+        for i in 0..(remaining_length - start_of_payload_byte) do
+            payload += data_string[counter]
+            counter += 1
+        end
+
+        # puts topic
+        # puts payload
+
+        return
     end
 
     def handle_subscribe(data, data_string, connected_clients, counter)

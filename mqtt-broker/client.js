@@ -8,7 +8,7 @@ client.on('connect', function (connack) {
     // console.log(connack)
     client.subscribe('sensor', function (err) {
         if (!err) {
-            // client.publish('presence', 'Hello mqtt')
+            client.publish('sensor', '7')
         } else {
             console.log('THERE WAS ERROR')
         }
