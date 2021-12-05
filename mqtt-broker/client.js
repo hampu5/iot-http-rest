@@ -10,18 +10,6 @@ const rl = readline.createInterface({
 
 client.on('connect', function (connack) {
     handleInput()
-    // client.subscribe('sensor', 5, 6, 7)
-    
-
-    // console.log(`Connected, CONNACK: ${connack}`)
-    // console.log(connack)
-    // client.subscribe('sensor', function (err) {
-    //     if (!err) {
-    //         client.publish('sensor', '7')
-    //     } else {
-    //         console.log('THERE WAS ERROR')
-    //     }
-    // })
 })
 
 client.on('message', function (topic, message) {
@@ -31,41 +19,66 @@ client.on('message', function (topic, message) {
 })
 
 client.on('packetreceive', function (packet) {
-    // console.log(packet)
+    switch (packet.cmd) {
+        case 'connack':
+            console.log('Connected to Broker!')
+            break
+        case 'publish':
+            console.log(`Received Value: ${packet.payload}`)
+        case 'puback':
+            console.log('Publish success!')
+            break
+        case 'suback':
+            console.log('Subscribe success!')
+            break
+        case 'unsuback':
+            console.log('Unsubscribe success!')
+            break
+        case 'pingresp':
+            // console.log('Ping success!')
+            break
+        default:
+            console.log('Unrecognized packet.')
+    }
 })
 
 client.on('packetsend', function (packet) {
-    console.log(packet)
+    
+    // console.log(packet)
 })
 
 const request = {
-    sub: function (topic) {
+    subscribe: function (topic) {
         client.subscribe(topic)
     },
-    pub: function (topic, message) {
+    unsubscribe: function (topic) {
+        client.unsubscribe(topic)
+    },
+    publish: function (topic, message) {
         client.publish(topic, message)
+    },
+    disconnect: function () {
+        client.end()
     }
 }
 
 function handleInput() {
 
-    rl.question("Enter command: ", (command) => {
+    rl.question("\nEnter command: ", (command) => {
         if (command === 'exit') {
             rl.close()
             client.end()
             return
         }
-        const parsed = command.split(" ")
-        console.log(parsed)
-        const requestMethod = request[parsed[0]]
-        parsed.splice(0, 1)
-        console.log(requestMethod)
-        console.log(parsed)
 
+        const parsed = command.split(" ")
+        // Method to call (publish, subscribe, ...)
+        const requestMethod = request[parsed[0]]
+        // Parameters to the request (<topic>, <value>)
+        parsed.splice(0, 1)
         
         try {
             if (typeof requestMethod === 'function') {
-                // client.subscribe.apply(null, ['sensor'])
                 if (parsed.length === 0) {
                     requestMethod.apply(client)
                     return rl.close()
