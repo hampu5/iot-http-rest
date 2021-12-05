@@ -16,10 +16,13 @@ end
 
 # Class that holds a value for a topic and its subscribers
 class Topic
-    def initialize(topic, value)
-        @topic = topic
+    def initialize(value)
         @value = value
         @clients = []
+    end
+
+    def get_clients()
+        return @clients
     end
 
     def change_value(value)
@@ -33,19 +36,66 @@ class Topic
     def remove_client(client)
         @clients.delete(client)
     end
+
+    def is_not_subscribed_to_by(client)
+        return !@clients.include?(client)
+    end
 end
 
 class Topics
     def initialize()
-        @topics = []
+        @topics = {}
     end
 
-    def publish_to(topic, value)
-        @topics.append(Topic.new(topic, value))
+    def publish_to(topic_p, value_p, client_p)
+        if exist(topic_p) then
+            topic = @topics[topic_p]
+            topic.change_value(value_p)
+
+            if topic.is_not_subscribed_to_by(client_p) then
+                topic.add_client(client_p)
+            end
+        else
+            topic = Topic.new(value_p)
+            topic.add_client(client_p)
+            @topics[topic_p] = topic
+        end
+    end
+
+    def subscribe_to(topic_p, client_p)
+        if exist(topic_p) then
+            topic = @topics[topic_p]
+            
+            if topic.is_not_subscribed_to_by(client_p) then
+                topic.add_client(client_p)
+            end
+        else
+            topic = Topic.new(nil)
+            topic.add_client(client_p)
+            @topics[topic_p] = topic
+        end
+    end
+
+    def get_subscribers(topic_p)
+        if exist(topic_p) then
+            topic = @topics[topic_p]
+            return topic.get_clients()
+        end
+        return []
     end
 
     def remove_client(client)
+        @topics.each do |topic_name, topic|
+            topic.remove_client(client)
+        end
+    end
 
+    private
+
+    def exist(topic)
+        return @topics.key?(topic)
+    end
+end
 
 # This class represents a connected client
 class MQTTClientConnection
@@ -81,11 +131,7 @@ class MQTTClientConnection
                 response = handle_ping()
             when TYPE::DISCONNECT
                 puts 'Disconnect!'
-                connected_clients.delete(@client_id)
-                topics.each do |e_topic|
-                    puts e_topic
-                    topics[e_topic][1].delete(@client_id)
-                end
+                topics.remove_client(@client_id)
                 @client.close
                 return
             else
@@ -182,27 +228,11 @@ class MQTTClientConnection
             counter += 1
         end
 
-        # If the topic is registered in the broker
-        if topics.key?(topic)
-            # If the topic is registered for this client
-            if @topics.key?(topic)
-                # Just change the value for this topic
-                topics[topic][0] = payload
-            else
-                # Change the value of the topic and add this client as a subscriber
-                topics[topic] = [payload, topics[topic][1].append(@client_id)]
-                # Add the topic to this clients topics
-                @topics[topic] = payload
-            end
-        else
-            # Add the value and add the client as the first subscriber
-            topics[topic] = [payload, [@client_id]]
-            # Add the topic to this clients topics
-            @topics[topic] = payload
-        end
+        topics.publish_to(topic, payload, @client_id)
 
         # Publish new value to each subscriber
-        topics[topic][1].each { |x| connected_clients[x].write(data_string) }
+        subscribers = topics.get_subscribers(topic)
+        subscribers.each { |x| connected_clients[x].write(data_string) }
 
         # PUBACK
         return
@@ -243,21 +273,7 @@ class MQTTClientConnection
         # Last Byte (doesn't seem to work)
         last_qos = data[counter]
         
-        # If the topic is registered in the broker
-        if topics.key?(topic)
-            # If the topic isn't registered for this client
-            if !@topics.key?(topic)
-                # Add this client as a subscriber
-                topics[topic][2] = topics[topic][1].append(@client_id)
-                # Add the topic to this clients topics
-                @topics[topic] = nil
-            end
-        else
-            # Add the value nil and add the client as the first subscriber
-            topics[topic] = [nil, [@client_id]]
-            # Add the topic to this clients topics
-            @topics[topic] = nil
-        end
+        topics.subscribe_to(topic, @client_id)
 
         # SUBACK
         return [0x90, 0x03, packet_id_msb, packet_id_lsb, 0x01].pack('C*') # Success Maximum QoS 1
@@ -312,8 +328,7 @@ class MQTTBroker
         @tcp_port = port
         @tcp_server = TCPServer.new(@tcp_host, @tcp_port)
         @connected_clients = {}
-        # @topics = {'sensor' => 5} #Create one for testing
-        @topics = {}
+        @topics = Topics.new
     end
 
     def listen()
@@ -322,7 +337,6 @@ class MQTTBroker
             Thread.start(@tcp_server.accept) do |client|
                 puts "TCP client connected: #{client.peeraddr[2]}:#{client.peeraddr[1]}"
                 client_connection = MQTTClientConnection.new(client)
-                # client_id = ''
                 client_connection.receive(@connected_clients, @topics)
                 
             end
