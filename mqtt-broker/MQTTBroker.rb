@@ -14,9 +14,10 @@ module TYPE
     DISCONNECT = 14
 end
 
+# This class represents a connected client
 class MQTTClientConnection
     def initialize(client)
-        @client = client
+        @client = client # Socket to client
         @client_id = ''
         @topics = {}
     end
