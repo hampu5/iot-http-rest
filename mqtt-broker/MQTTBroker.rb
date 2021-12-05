@@ -76,6 +76,13 @@ class Topics
         end
     end
 
+    def unsubscribe_to(topic_p, client_p)
+        if exist(topic_p) then
+            topic = @topics[topic_p]
+            topic.remove_client(client_p)
+        end
+    end
+
     def get_subscribers(topic_p)
         if exist(topic_p) then
             topic = @topics[topic_p]
@@ -126,7 +133,7 @@ class MQTTClientConnection
             when TYPE::SUBSCRIBE
                 response = handle_subscribe(data, data_string, connected_clients, topics, counter)
             when TYPE::UNSUBSCRIBE
-                response = handle_unsubscribe(data, data_string, connected_clients, counter)
+                response = handle_unsubscribe(data, data_string, connected_clients, topics, counter)
             when TYPE::PINGREQ
                 response = handle_ping()
             when TYPE::DISCONNECT
@@ -279,7 +286,7 @@ class MQTTClientConnection
         return [0x90, 0x03, packet_id_msb, packet_id_lsb, 0x01].pack('C*') # Success Maximum QoS 1
     end
 
-    def handle_unsubscribe(data, data_string, connected_clients, counter)
+    def handle_unsubscribe(data, data_string, connected_clients, topics, counter)
         # First Byte (second 4 bits)
         dup_flag = (0x0F & data[counter]) >> 3
         qos_level = (0b00000111 & data[counter]) >> 1 # Should be 1
@@ -310,6 +317,8 @@ class MQTTClientConnection
             topic += data_string[counter]
             counter += 1
         end
+
+        topics.unsubscribe_to(topic, @client_id)
 
         # UNSUBACK
         return [0xB0, 0x02, packet_id_msb, packet_id_lsb].pack('C*')
