@@ -145,6 +145,10 @@ class MQTTClientConnection
         @topics = {}
     end
 
+    def get_client_id()
+        return @client_id
+    end
+
     def receive(connected_clients, topics)
         loop do
             # Wait for data from the client
@@ -171,8 +175,8 @@ class MQTTClientConnection
                 response = handle_ping()
             when TYPE::DISCONNECT
                 puts 'Disconnect!'
-                # topics.remove_client(@client_id)
                 @client.close
+                connected_clients.delete(@client_id)
                 return
             else
                 response = 'Could not process request!'
@@ -386,7 +390,12 @@ class MQTTBroker
             Thread.start(@tcp_server.accept) do |client|
                 puts "TCP client connected: #{client.peeraddr[2]}:#{client.peeraddr[1]}"
                 client_connection = MQTTClientConnection.new(client)
-                client_connection.receive(@connected_clients, @topics)
+                begin
+                    client_connection.receive(@connected_clients, @topics)
+                rescue
+                    client.close
+                    @connected_clients.delete(client_connection.get_client_id)
+                end
                 
             end
         end
