@@ -25,6 +25,10 @@ class Topic
         return @clients
     end
 
+    def get_value()
+        return @value
+    end
+
     def change_value(value)
         @value = value
     end
@@ -37,8 +41,8 @@ class Topic
         @clients.delete(client)
     end
 
-    def is_not_subscribed_to_by(client)
-        return !@clients.include?(client)
+    def has(client)
+        return @clients.include?(client)
     end
 end
 
@@ -47,16 +51,34 @@ class Topics
         @topics = {}
     end
 
-    def publish_to(topic_p, value_p, client_p)
+    def get_value(topic_p)
+        return @topics[topic_p].get_value()
+    end
+
+    def retain_value(topic_p, value_p)
         if exist(topic_p) then
             topic = @topics[topic_p]
             topic.change_value(value_p)
+        end
+    end
 
-            if topic.is_not_subscribed_to_by(client_p) then
+    def publish_to(topic_p, value_p, client_p, retain)
+        if exist(topic_p) then
+            topic = @topics[topic_p]
+
+            if !topic.has(client_p) then
                 topic.add_client(client_p)
             end
+
+            if retain then
+                topic.change_value(value_p)
+            end
         else
-            topic = Topic.new(value_p)
+            if retain then
+                topic = Topic.new(value_p)
+            else
+                topic = Topic.new(nil)
+            end
             topic.add_client(client_p)
             @topics[topic_p] = topic
         end
@@ -66,7 +88,7 @@ class Topics
         if exist(topic_p) then
             topic = @topics[topic_p]
             
-            if topic.is_not_subscribed_to_by(client_p) then
+            if !topic.has(client_p) then
                 topic.add_client(client_p)
             end
         else
@@ -84,9 +106,24 @@ class Topics
         return []
     end
 
-    def remove_client(client)
+    def get_topics(client_p)
+        topics_out = []
         @topics.each do |topic_name, topic|
-            topic.remove_client(client)
+            if topic.has(client_p) then
+                topics_out.append(topic)
+            end
+        end
+
+        return topics_out
+    end
+
+    def remove_client_unsub(topic_p, client_p)
+        @topics[topic_p].remove_client(client_p)
+    end
+
+    def remove_client(client_p)
+        @topics.each do |topic_name, topic|
+            topic.remove_client(client_p)
         end
     end
 
@@ -120,18 +157,18 @@ class MQTTClientConnection
             
             case packet_type
             when TYPE::CONNECT
-                response = handle_connect(data, data_string, connected_clients, counter)
+                response = handle_connect(data, data_string, connected_clients, topics, counter)
             when TYPE::PUBLISH
                 response = handle_publish(data, data_string, connected_clients, topics, counter)
             when TYPE::SUBSCRIBE
                 response = handle_subscribe(data, data_string, connected_clients, topics, counter)
             when TYPE::UNSUBSCRIBE
-                response = handle_unsubscribe(data, data_string, connected_clients, counter)
+                response = handle_unsubscribe(data, data_string, connected_clients, topics, counter)
             when TYPE::PINGREQ
                 response = handle_ping()
             when TYPE::DISCONNECT
                 puts 'Disconnect!'
-                topics.remove_client(@client_id)
+                # topics.remove_client(@client_id)
                 @client.close
                 return
             else
@@ -142,7 +179,7 @@ class MQTTClientConnection
         end
     end
 
-    def handle_connect(data, data_string, connected_clients, counter)
+    def handle_connect(data, data_string, connected_clients, topics, counter)
         # First Byte (second 4 bits)
         dup_flag = (0x0F & data[counter]) >> 3
         qos_level = (0b00000111 & data[counter]) >> 1
@@ -191,15 +228,18 @@ class MQTTClientConnection
         # Add client to list of connected clients in broker
         connected_clients[@client_id] = @client
 
+        subscribed_topics = topics.get_topics(@client_id)
+        subscribed_topics.each { |x| @client.write(x.get_value()) }
+
         # CONNACK
         return [0x20, 0x02, 0x00, 0x00].pack('C*')
     end
 
     def handle_publish(data, data_string, connected_clients, topics, counter)
         # First Byte (second 4 bits)
-        dup_flag = (0x0F & data[counter]) >> 3
-        qos_level = (0b00000111 & data[counter]) >> 1 # Should be 1
-        retain = (0b00000001)
+        dup_flag = (0b00001000 & data[counter]) >> 3
+        qos_level = (0b00000110 & data[counter]) >> 1 # Should be 1
+        retain = (0b00000001 & data[counter])
         counter += 1
 
         # Second Byte
@@ -228,7 +268,9 @@ class MQTTClientConnection
             counter += 1
         end
 
-        topics.publish_to(topic, payload, @client_id)
+        if retain == 1 then
+            topics.retain_value(topic, data_string)
+        end
 
         # Publish new value to each subscriber
         subscribers = topics.get_subscribers(topic)
@@ -275,11 +317,13 @@ class MQTTClientConnection
         
         topics.subscribe_to(topic, @client_id)
 
+        @client.write(topics.get_value(topic))
+
         # SUBACK
         return [0x90, 0x03, packet_id_msb, packet_id_lsb, 0x01].pack('C*') # Success Maximum QoS 1
     end
 
-    def handle_unsubscribe(data, data_string, connected_clients, counter)
+    def handle_unsubscribe(data, data_string, connected_clients, topics, counter)
         # First Byte (second 4 bits)
         dup_flag = (0x0F & data[counter]) >> 3
         qos_level = (0b00000111 & data[counter]) >> 1 # Should be 1
@@ -310,6 +354,8 @@ class MQTTClientConnection
             topic += data_string[counter]
             counter += 1
         end
+
+        topics.remove_client_unsub(topic, @client_id)
 
         # UNSUBACK
         return [0xB0, 0x02, packet_id_msb, packet_id_lsb].pack('C*')
