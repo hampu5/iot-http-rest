@@ -63,8 +63,7 @@ const request = {
 }
 
 function handleInput() {
-
-    rl.question("\nEnter command: ", (command) => {
+    rl.question("> ", (command) => {
         if (command === 'exit') {
             rl.close()
             client.end()

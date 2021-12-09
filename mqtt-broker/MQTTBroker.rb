@@ -98,6 +98,13 @@ class Topics
         end
     end
 
+    def unsubscribe_to(topic_p, client_p)
+        if exist(topic_p) then
+            topic = @topics[topic_p]
+            topic.remove_client(client_p)
+        end
+    end
+
     def get_subscribers(topic_p)
         if exist(topic_p) then
             topic = @topics[topic_p]
@@ -115,10 +122,6 @@ class Topics
         end
 
         return topics_out
-    end
-
-    def remove_client_unsub(topic_p, client_p)
-        @topics[topic_p].remove_client(client_p)
     end
 
     def remove_client(client_p)
@@ -355,7 +358,7 @@ class MQTTClientConnection
             counter += 1
         end
 
-        topics.remove_client_unsub(topic, @client_id)
+        topics.unsubscribe_to(topic, @client_id)
 
         # UNSUBACK
         return [0xB0, 0x02, packet_id_msb, packet_id_lsb].pack('C*')
