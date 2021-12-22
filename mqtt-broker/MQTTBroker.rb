@@ -176,6 +176,7 @@ class MQTTClientConnection
             when TYPE::DISCONNECT
                 puts 'Disconnect!'
                 @client.close
+                # Maybe remove client from topics as well
                 connected_clients.delete(@client_id)
                 return
             else
