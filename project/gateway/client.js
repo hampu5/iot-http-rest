@@ -68,9 +68,9 @@ const objClassCode = new Proxy({
     5: objServerErrorCode
 }, {get: defaultKey(objClientErrorCode)}) // Just Client error if no Class
 
-function defaultKey(defaultText) {
+function defaultKey(defaultStuff) {
     return function(object, property) {
-        return object.hasOwnProperty(property) ? object[property] : defaultText
+        return object.hasOwnProperty(property) ? object[property] : defaultStuff
     }
 }
 
