@@ -11,19 +11,19 @@ export default function coapClient() {
 
     const udpsocket = dgram.createSocket('udp4')
     
-    function connect(port, address) {
+    this.connect = function(port, address) {
         remotePort = port
         remoteAddress = address
         udpsocket.connect(remotePort, remoteAddress)
     }
 
-    function onConnect(callback) {
+    this.onConnect = function(callback) {
         udpsocket.on('connect', () => {
             callback()
         })
     }
 
-    function request(reqMethod, reqPath, payload = '') {
+    this.request = function(reqMethod, reqPath, payload = '') {
         const reqCode = (() => {
             try {
                 switch (reqMethod) {
@@ -74,7 +74,7 @@ export default function coapClient() {
         }
     }
 
-    function onMessage(callback) {
+    this.onMessage = function(callback) {
         udpsocket.on('message', (data) => {
             const hClass = COAP_HEADER_CLASS(data)
             const hCode = COAP_HEADER_CODE(data)
@@ -84,7 +84,7 @@ export default function coapClient() {
             // Use objects to get the status message
             const statusMessage = objClassCode[hClass][hCode]
             
-            callback(statusMessage + `: ${payload}`) // send separate payload and statusmessage
+            callback(payload, statusMessage) // send separate payload and statusmessage
             // udpsocket.close()
         })
     }

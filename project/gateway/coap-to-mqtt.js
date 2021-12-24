@@ -1,5 +1,5 @@
 import mqtt from 'mqtt'
-import coapClient from './client.js'
+import coapClient from './coapClient.js'
 
 const client = new coapClient()
 
@@ -18,8 +18,8 @@ client.onConnect(() => {
     fetchValue()
 })
 
-client.onMessage((message) => {
-    console.log(message)
+client.onMessage((payload, statusMessage) => {
+    console.log(statusMessage + `: ${payload}`)
 })
 
 client.connect(remotePort, remoteAddress)
