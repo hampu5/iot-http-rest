@@ -1,5 +1,7 @@
-import coap from 'coap'
-import Telnet from 'telnet-client'
+//import coap from 'coap'
+//import Telnet from 'telnet-client'
+coap = require('coap')
+Telnet = require('telnet-client')
 
 const server = coap.createServer()
 const telnetConnection = new Telnet()
@@ -7,7 +9,11 @@ const telnetConnection = new Telnet()
 const telnetParams = {
   host: '127.0.0.1',
   port: 4711,
-  //negotiationMandatory: false
+  shellPrompt: '',
+  timeout: 10000,
+  negotiationMandatory: false,
+  ors: '\r\n',
+  waitfor: '\n'
 }
 
 const cmd = '>recentBlocked'
@@ -16,29 +22,29 @@ let domain = ''
 
 function blockedDNS() {
   setTimeout(() => {
-    telnetConnection.exec(cmd, function(err, response) {
-      domain = response
+    telnetConnection.send(cmd, function(err, response) {
+      domain = Math.floor(Math.random() * 10).toString()
+      domain += ' ' + response.split('\n')[0]
       console.log(domain)
       blockedDNS()
     })
   }, 5000)
 }
 
-telnetConnection.on('ready', function(prompt) {
+telnetConnection.on('connect', function() {
+  console.log("Connected")
   blockedDNS()
 })
 
 telnetConnection.connect(telnetParams)
 
-// Generate vals from pihole-FTL through telnet 127.0.0.1 4711
-// with the command >recentBlocked instead of:
-let val = Math.floor(Math.random() * 10).toString()
-console.log(val) 
-
 server.on('request', (req, res) => {
   const path = req.url.split('/')[1]
   if (path === 'sensor') { res.end(val) }
+  if (path === 'blocked') { res.end(domain) }
 })
+
+let val = Math.floor(Math.random() * 10).toString()
 
 function RNG() {
   setTimeout(() => {
