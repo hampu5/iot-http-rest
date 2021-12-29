@@ -142,7 +142,7 @@ class MQTTClientConnection
     def initialize(client)
         @client = client # Socket to client
         @client_id = ''
-        @topics = {}
+        # @topics = {}
     end
 
     def get_client_id()
