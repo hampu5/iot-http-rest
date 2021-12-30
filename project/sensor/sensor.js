@@ -28,7 +28,7 @@ function getBlockedDomain() {
       console.log(domain)
       getBlockedDomain()
     })
-  }, 5000)
+  }, 3000)
 }
 
 telnetConnection.on('connect', function() {
