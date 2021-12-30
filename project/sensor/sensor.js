@@ -20,20 +20,20 @@ const cmd = '>recentBlocked'
 
 let domain = ''
 
-function blockedDNS() {
+function getBlockedDomain() {
   setTimeout(() => {
     telnetConnection.send(cmd, function(err, response) {
       domain = Math.floor(Math.random() * 10).toString()
       domain += ' ' + response.split('\n')[0]
       console.log(domain)
-      blockedDNS()
+      getBlockedDomain()
     })
   }, 5000)
 }
 
 telnetConnection.on('connect', function() {
   console.log("Connected")
-  blockedDNS()
+  getBlockedDomain()
 })
 
 telnetConnection.connect(telnetParams)
