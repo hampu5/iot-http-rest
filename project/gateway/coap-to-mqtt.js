@@ -3,7 +3,7 @@ import coapClient from './coapClient.js'
 
 
 const remotePort = '5683'
-const remoteAddress = '192.168.1.33'
+const remoteAddress = 'localhost' // '192.168.1.33'
 const brokerPort = '1883'
 const brokerAddress = 'localhost'
 
@@ -16,7 +16,7 @@ function fetchValue() {
     setTimeout(() => {
         client.request('GET', topic)
         fetchValue()
-    }, 3000)
+    }, 500)
 }
 
 client.onConnect(() => {
@@ -26,7 +26,7 @@ client.onConnect(() => {
 })
 
 client.onMessage((payload, statusMessage) => {
-    console.log(statusMessage + `: ${payload}`)
+    // console.log(statusMessage + `: ${payload}`)
     mqttClient.publish(topic, payload)
 })
 
