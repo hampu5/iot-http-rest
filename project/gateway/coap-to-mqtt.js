@@ -3,7 +3,7 @@ import coapClient from './coapClient.js'
 
 
 const remotePort = '5683'
-const remoteAddress = 'localhost' // '192.168.1.33'
+const remoteAddress = '192.168.1.33'
 const brokerPort = '1883'
 const brokerAddress = 'localhost'
 
@@ -11,12 +11,15 @@ let topic = 'blocked'
 
 const client = new coapClient()
 const mqttClient  = mqtt.connect({ host: brokerAddress, port: brokerPort })
+mqttClient.on("connect", () => {console.log("Connected")})
+mqttClient.on("disconnect", () => {console.log("Disconnected")})
+mqttClient.on("close", () => {console.log("Closed")})
 
 function fetchValue() {
     setTimeout(() => {
         client.request('GET', topic)
         fetchValue()
-    }, 500)
+    }, 1000)
 }
 
 client.onConnect(() => {

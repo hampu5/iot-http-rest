@@ -176,7 +176,7 @@ class MQTTClientConnection
             when TYPE::DISCONNECT
                 puts 'Disconnect!'
                 @client.close
-                # Maybe remove client from topics as well
+                topics.remove_client(@client_id)
                 connected_clients.delete(@client_id)
                 return
             else
@@ -394,12 +394,11 @@ class MQTTBroker
                 begin
                     client_connection.receive(@connected_clients, @topics)
                 rescue
-                    puts "Disconnect!"
+                    puts "Crash!"
                     client.close
                     @topics.remove_client(client_connection.get_client_id)
                     @connected_clients.delete(client_connection.get_client_id)
                 end
-                
             end
         end
     end
